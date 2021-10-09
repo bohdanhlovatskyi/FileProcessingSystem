@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"syscall"
 	"text/template"
 	"time"
@@ -139,7 +140,7 @@ func (u *Uploader) Display(w http.ResponseWriter, r *http.Request) {
 
 type Entry struct {
 	File            string `json:"file"`
-	Path            string `json:"-"`
+	Path            string `json:"path"`
 	Size            int64  `json:"size"`
 	ContentType     string `json:"content-type"`
 	TimeOfUploading string `json:"uploaded"`
@@ -170,6 +171,14 @@ func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// very simple validation, should be rewritten
+	content_type := header.Header["Content-Type"][0]
+	reg, _ := regexp.Compile("(png|jpeg)")
+	if !reg.MatchString(content_type) {
+		http.Error(rw, fmt.Sprint("you can upload only images"), http.StatusBadRequest)
+		return
+	}
+
 	// creates a file on the local storage to save the file
 	filePath := filepath.Join(DIR, header.Filename)
 	dst, err := os.Create(filePath)
@@ -192,7 +201,7 @@ func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
 		File:            header.Filename,
 		Path:            filePath,
 		Size:            header.Size,
-		ContentType:     header.Header["Content-Type"][0],
+		ContentType:     content_type,
 		TimeOfUploading: time.Now().String(),
 		ID:              len(u.DataStorage),
 	}
