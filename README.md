@@ -1,4 +1,6 @@
-## System for uploading and processing files
+
+## Description
+### System for uploading and processing files
 
 - consists of two microservices:
   - file uploading and retrieval (Files API)
@@ -13,3 +15,7 @@
 - reduces the image size
 - overwrites the file in the file system
 
+## Usage
+docker-compose up --build
+
+http://localhost:15672 (guest both as login and password)

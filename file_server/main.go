@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,14 +16,61 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/streadway/amqp"
 )
 
 const (
-	DIR = "uploaded_files"
+	DIR      = "uploaded_files"
+	AMPQ_URL = "amqp://guest:guest@localhost:5672/"
 )
 
 func init() {
 	os.Mkdir(DIR, 0777)
+}
+
+type Uploader struct {
+	l           *log.Logger
+	DataStorage []*Entry
+	sendConn    *amqp.Connection
+	sendChan    *amqp.Channel
+}
+
+func (u *Uploader) init_rabitMQ() error {
+	// establishes connection
+	conn, err := amqp.Dial(AMPQ_URL)
+	if err != nil {
+		u.l.Printf("could not set connection with the queue: %v\n", err)
+		return err
+	}
+	// defer conn.Close()
+
+	// opens a channel over the openned connection
+	ch, err := conn.Channel()
+	if err != nil {
+		u.l.Printf("could not open a channel to communicate with queue: %v\n", err)
+		return err
+	}
+	// defer ch.Close()
+
+	// declares queue over the openned channel
+	_, err = ch.QueueDeclare(
+		"UploadedFiles",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		u.l.Printf("could not create a queue over the openned channel: %v\n", err)
+		return err
+	}
+
+	u.sendConn = conn
+	u.sendChan = ch
+
+	return nil
 }
 
 func main() {
@@ -29,6 +78,17 @@ func main() {
 
 	upl := &Uploader{
 		l: l,
+	}
+
+	err := upl.init_rabitMQ()
+	// TODO: this is obviously not the best way to go
+	defer upl.sendChan.Close()
+	defer upl.sendConn.Close()
+
+	if err != nil {
+		// TODO: not sure that we need to terminate it here
+		// log.Fatal(err)
+		l.Printf("could not connect to the rabbit mq\n")
 	}
 
 	sm := mux.NewRouter()
@@ -67,11 +127,6 @@ func main() {
 	s.Shutdown(tc)
 }
 
-type Uploader struct {
-	l           *log.Logger
-	DataStorage []*Entry
-}
-
 var templates = template.Must(template.ParseFiles("front/upload.html"))
 
 func display(w http.ResponseWriter, page string, data interface{}) {
@@ -83,11 +138,12 @@ func (u *Uploader) Display(w http.ResponseWriter, r *http.Request) {
 }
 
 type Entry struct {
-	File            string
-	Path            string
-	Size            int64
-	ContentType     string
-	TimeOfUploading string
+	File            string `json:"file"`
+	Path            string `json:"-"`
+	Size            int64  `json:"size"`
+	ContentType     string `json:"content-type"`
+	TimeOfUploading string `json:"uploaded"`
+	ID              int    `json:"id"`
 }
 
 func (f *Entry) String() string {
@@ -95,6 +151,11 @@ func (f *Entry) String() string {
 		"File(%s, path: %s, size: %d, content type: %s, time of uploading: %s)",
 		f.File, f.Path, f.Size, f.ContentType, f.TimeOfUploading,
 	)
+}
+
+func (f *Entry) ToJSON(w io.Writer) error {
+	e := json.NewEncoder(w)
+	return e.Encode(f)
 }
 
 func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
@@ -133,9 +194,50 @@ func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
 		Size:            header.Size,
 		ContentType:     header.Header["Content-Type"][0],
 		TimeOfUploading: time.Now().String(),
+		ID:              len(u.DataStorage),
 	}
 
 	u.DataStorage = append(u.DataStorage, entry)
 
+	err = u.publishToQueue(entry.ID)
+	if err != nil {
+		u.l.Print(err)
+	}
+
 	fmt.Fprint(rw, entry.String())
+}
+
+func (u *Uploader) publishToQueue(fileID int) error {
+
+	// prepare the  data
+	var buf bytes.Buffer
+	err := u.DataStorage[fileID].ToJSON(&buf)
+	if err != nil {
+		u.l.Printf("could not serialise data into json: %v\n", err)
+		return err
+	}
+	// TODO: not sure that way of passing contenttype is ok here
+	if u.sendChan != nil {
+		err = u.sendChan.Publish(
+			"",
+			"UploadedFiles",
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        buf.Bytes(),
+			},
+		)
+	}
+
+	if err != nil {
+		u.l.Printf("could not publish the message: %v\n", err)
+		return err
+	}
+
+	if u.sendChan != nil {
+		u.l.Print("Successfully published the message to the queue")
+	}
+
+	return nil
 }
