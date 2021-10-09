@@ -1,27 +1,36 @@
-# ./Dockerfile-sender
+FROM golang:alpine AS builder
 
-FROM golang:1.16-alpine AS builder
+# Set necessary environmet variables needed for our image
+ENV GO111MODULE=on \
+    CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64
 
-# Move to working directory (/build).
+# Move to working directory /build
 WORKDIR /build
 
-# Copy and download dependency using go mod.
-COPY go.mod go.sum ./
+# Copy and download dependency using go mod
+COPY go.mod .
+COPY go.sum .
 RUN go mod download
 
-# Copy the code into the container.
-COPY ./file_server/main.go .
+# Copy the code into the container
+COPY ./file_server .
 
-# Set necessary environment variables needed 
-# for our image and build the sender.
-ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -ldflags="-s -w" -o sender .
+# Build the application
+RUN go build -o main .
 
+# Move to /dist directory as the place for resulting binary folder
+WORKDIR /dist
+
+# Copy binary from build to main folder
+RUN cp /build/main .
+
+# Build a small image
 FROM scratch
 
-# Copy binary and config files from /build 
-# to root folder of scratch container.
-COPY --from=builder ["/build/sender", "/"]
+COPY --from=builder /dist/main /
+COPY ./front/upload.html ./front/upload.html
 
-# Command to run when starting the container.
-ENTRYPOINT ["/sender"]
+# Command to run
+ENTRYPOINT ["/main"]

@@ -21,7 +21,7 @@ services:
   sender:
     container_name: sender
     ports:
-      - 80:80
+      - 8080:80
     build:
       context: .
       dockerfile: Dockerfile-sender
