@@ -20,3 +20,10 @@ http://localhost:8080/upload - to upload the photos (that then will be automatic
 - accepts file ID from a RabbitMQ queue
 - reduces the image size
 - overwrites the file in the file system
+
+## Example of execution:
+- UI:
+![](examples/front.png) 
+
+- Logs:
+![](examples/logs.png)
