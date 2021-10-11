@@ -20,7 +20,7 @@ func main() {
 	// Create a new RabbitMQ connection.
 	connectRabbitMQ, err := amqp.Dial(AMPQ_URL)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer connectRabbitMQ.Close()
 
