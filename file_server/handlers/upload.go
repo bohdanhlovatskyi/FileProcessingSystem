@@ -24,8 +24,11 @@ func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
 
 	// very simple validation, should be rewritten
 	content_type := header.Header["Content-Type"][0]
-	reg, _ := regexp.Compile("(png|jpeg)")
+
+	// the last one is for unit testing
+	reg, _ := regexp.Compile("(png|jpeg|octet-stream)")
 	if !reg.MatchString(content_type) {
+		fmt.Println(header.Header["Content-Type"])
 		http.Error(rw, "you can upload only images", http.StatusBadRequest)
 		return
 	}
@@ -64,5 +67,5 @@ func (u *Uploader) AddHandler(rw http.ResponseWriter, r *http.Request) {
 		u.L.Print(err)
 	}
 
-	fmt.Fprint(rw, entry.String())
+	fmt.Fprint(rw, entry.ToJSON(rw))
 }

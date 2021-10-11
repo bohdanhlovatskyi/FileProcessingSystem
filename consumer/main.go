@@ -53,7 +53,7 @@ func main() {
 	// Make a channel to receive messages into infinite loop.
 	forever := make(chan bool)
 
-	p := processing.Processor{L: *log.Default()}
+	p := processing.Processor{L: log.Default()}
 
 	go func() {
 		for f := range files {

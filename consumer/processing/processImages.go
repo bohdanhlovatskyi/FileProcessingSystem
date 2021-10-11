@@ -15,7 +15,7 @@ import (
 )
 
 type Processor struct {
-	L log.Logger
+	L *log.Logger
 }
 
 type Entry struct {
