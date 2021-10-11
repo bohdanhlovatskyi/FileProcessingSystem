@@ -1,0 +1,11 @@
+FROM golang:latest
+
+ENV GO111MODULE=on
+
+
+RUN mkdir /app 
+ADD . /app/
+WORKDIR /app 
+RUN go build file_server/main.go 
+RUN go install file_server/main.go 
+CMD ["/app/main"]

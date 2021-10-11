@@ -8,6 +8,8 @@ services:
   message-broker:
     image: rabbitmq:3-management-alpine
     container_name: message-broker
+    environment:
+      RABBITMQ_SERVER: rabbitmq
     ports:
       - 5672:5672   # for sender and consumer connections
       - 15672:15672 # for serve RabbitMQ GUI
@@ -21,7 +23,7 @@ services:
   sender:
     container_name: sender
     ports:
-      - 8080:80
+      - 8080:8080
     build:
       context: .
       dockerfile: Dockerfile-sender
@@ -31,7 +33,8 @@ services:
     networks:
       - dev-network
     depends_on:
-      - message-broker
+      message-broker:
+        condition: service_started
 
   consumer:
     container_name: consumer
@@ -44,8 +47,10 @@ services:
     networks:
       - dev-network
     depends_on:
-      - sender
-      - message-broker
+      sender:
+        condition: service_started
+      message-broker:
+        condition: service_started
 
 networks:
   # Create a new Docker network.

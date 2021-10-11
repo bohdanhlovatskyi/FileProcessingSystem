@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	AMPQ_URL = "amqp://guest:guest@localhost:5672/"
+	AMPQ_URL = "amqp://guest:guest@message-broker:5672/"
 )
 
 func main() {
